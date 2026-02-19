@@ -1,8 +1,20 @@
-import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles, Layout, Palette, Armchair, MonitorSmartphone } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, Sparkles, Layout, Palette, MonitorSmartphone } from 'lucide-react';
 import { motion } from 'framer-motion';
+import img from '../assets/img.png';
 
 const Home = () => {
+    const navigate = useNavigate();
+    const isAuthenticated = !!localStorage.getItem('token');
+
+    const handleGetStarted = () => {
+        if (isAuthenticated) {
+            navigate('/dashboard');
+        } else {
+            navigate('/register');
+        }
+    };
+
     return (
         <div className="bg-white overflow-hidden">
             {/* Hero Section */}
@@ -26,9 +38,12 @@ const Home = () => {
                             </p>
 
                             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                                <Link to="/register" className="px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white rounded-full font-semibold text-lg transition-all shadow-lg hover:shadow-primary-500/30 flex items-center gap-2">
-                                    Get Started Free <ArrowRight className="w-5 h-5" />
-                                </Link>
+                                <button
+                                    onClick={handleGetStarted}
+                                    className="px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white rounded-full font-semibold text-lg transition-all shadow-lg hover:shadow-primary-500/30 flex items-center gap-2"
+                                >
+                                    {isAuthenticated ? "Go to Dashboard" : "Get Started Free"} <ArrowRight className="w-5 h-5" />
+                                </button>
                                 <Link to="/demo" className="px-8 py-4 bg-white hover:bg-gray-50 text-gray-900 border border-gray-200 rounded-full font-semibold text-lg transition-all flex items-center gap-2">
                                     View Demo Gallery
                                 </Link>
@@ -96,7 +111,7 @@ const Home = () => {
                     </div>
                     <div className="flex-1 relative">
                         <img
-                            src="https://images.unsplash.com/photo-1616486338812-3dadae4b4f9d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+                            src={img}
                             alt="Before and After"
                             className="rounded-lg shadow-2xl border-4 border-gray-800 transform rotate-2 hover:rotate-0 transition-all duration-500"
                         />
