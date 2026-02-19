@@ -25,7 +25,7 @@ GruhaBuddy is a cutting-edge web application that leverages AI to transform your
 1.  **Node.js** (v18+)
 2.  **Python** (v3.10+)
 3.  **MongoDB** (Local or Atlas)
-4.  **Ollama** (for Chat) -> Run `ollama pull llama3.1:latest`
+4.  **Ollama** (for Chat) -> Run `ollama pull llama3.1:latest`(if not downloaded visit `https://ollama.com/download`)
 5.  **NVIDIA GPU** (Recommended for Local Image Gen) - *Works on CPU but slow.*
 
 ### Installation
