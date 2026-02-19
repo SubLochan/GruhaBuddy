@@ -17,17 +17,21 @@ const ChatBot = () => {
         setMessages(prev => [...prev, userMsg]);
         setInput('');
 
-        // Simulate bot response
-        setTimeout(() => {
-            let botResponse = "That sounds interesting! Try uploading a photo of your room to get started.";
-            if (input.toLowerCase().includes('price') || input.toLowerCase().includes('cost')) {
-                botResponse = "Our basic design generation is free! Premium features are coming soon.";
-            } else if (input.toLowerCase().includes('style')) {
-                botResponse = "We support Modern, Minimalist, Bohemian, and more styles. Check the dashboard options!";
-            }
-
-            setMessages(prev => [...prev, { text: botResponse, sender: 'bot' }]);
-        }, 1000);
+        // Call Backend API
+        fetch('http://localhost:5000/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: input })
+        })
+            .then(res => res.json())
+            .then(data => {
+                const botResponse = data.reply || "Sorry, I didn't get that.";
+                setMessages(prev => [...prev, { text: botResponse, sender: 'bot' }]);
+            })
+            .catch(err => {
+                console.error(err);
+                setMessages(prev => [...prev, { text: "Network error. Please try again.", sender: 'bot' }]);
+            });
     };
 
     return (
@@ -54,8 +58,8 @@ const ChatBot = () => {
                         {messages.map((msg, idx) => (
                             <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${msg.sender === 'user'
-                                        ? 'bg-primary-600 text-white rounded-br-none'
-                                        : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                                    ? 'bg-primary-600 text-white rounded-br-none'
+                                    : 'bg-gray-100 text-gray-800 rounded-bl-none'
                                     }`}>
                                     {msg.text}
                                 </div>

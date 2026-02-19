@@ -1,3 +1,10 @@
 flask
 flask-cors
 Requests
+python-dotenv
+Pillow
+ollama
+diffusers
+transformers
+accelerate
+torch
