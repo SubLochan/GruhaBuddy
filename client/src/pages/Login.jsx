@@ -1,96 +1,110 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Mail, Lock, ArrowRight } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
+import { ArrowRight, Layout } from 'lucide-react';
 
 const Login = () => {
-  const [formData, setFormData] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
-  const { login } = useAuth();
-  const navigate = useNavigate();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await login(formData.email, formData.password);
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
-    }
-  };
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const res = await axios.post('http://localhost:5000/api/auth/login', { email, password });
+            localStorage.setItem('token', 'mock-token');
+            localStorage.setItem('user', JSON.stringify({ id: res.data.userId, name: res.data.name }));
+            navigate('/dashboard');
+        } catch (err) {
+            console.error(err);
+            alert(err.response?.data?.msg || 'Login Failed');
+        }
+    };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-16 px-6 lg:px-8">
-      <div className="max-w-lg w-full space-y-10 bg-white p-10 rounded-2xl shadow-2xl">
-        {/* Header */}
-        <div>
-          <h2 className="text-center text-4xl font-extrabold text-gray-900">
-            Welcome Back
-          </h2>
-          <p className="mt-3 text-center text-base text-gray-600">
-            Or{' '}
-            <Link
-              to="/register"
-              className="font-medium text-purple-600 hover:text-purple-500"
-            >
-              start your 14-day free trial
-            </Link>
-          </p>
+    return (
+        <div className="h-screen flex overflow-hidden">
+            {/* Left Side - Visual */}
+            <div className="hidden lg:block lg:w-1/2 relative">
+                <div className="absolute inset-0 bg-primary-900/20 z-10"></div>
+                <img
+                    src="https://images.unsplash.com/photo-1618219908412-a29a1bb7b86e?q=80&w=2727&auto=format&fit=crop"
+                    className="w-full h-full object-cover"
+                    alt="Interior Design"
+                />
+                <div className="absolute bottom-0 left-0 p-12 z-20 text-white">
+                    <h2 className="text-4xl font-bold mb-4">Design without limits.</h2>
+                    <p className="text-lg text-white/80 max-w-md">Join thousands of homeowners creating their dream spaces with GruhaBuddy AI.</p>
+                </div>
+            </div>
+
+            {/* Right Side - Form */}
+            <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white overflow-y-auto">
+                <div className="max-w-md w-full space-y-8">
+                    <div className="text-center lg:text-left">
+                        <Link to="/" className="inline-flex items-center gap-2 mb-8">
+                            <div className="bg-primary-600 text-white p-1.5 rounded-lg">
+                                <Layout className="h-6 w-6" />
+                            </div>
+                            <span className="font-bold text-xl text-gray-900">GruhaBuddy</span>
+                        </Link>
+                        <h2 className="text-3xl font-bold text-gray-900">Welcome back</h2>
+                        <p className="mt-2 text-gray-600">Please enter your details to sign in.</p>
+                    </div>
+
+                    <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+                                <input
+                                    type="email"
+                                    required
+                                    className="appearance-none relative block w-full px-4 py-3 border border-gray-200 placeholder-gray-400 text-gray-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                                    placeholder="Enter your email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                <input
+                                    type="password"
+                                    required
+                                    className="appearance-none relative block w-full px-4 py-3 border border-gray-200 placeholder-gray-400 text-gray-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                                    placeholder="••••••••"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <input id="remember-me" type="checkbox" className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded" />
+                                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">Remember me</label>
+                            </div>
+                            <div className="text-sm">
+                                <a href="#" className="font-medium text-primary-600 hover:text-primary-500">Forgot password?</a>
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base font-semibold rounded-xl text-white bg-gray-900 hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900"
+                        >
+                            Sign in
+                        </button>
+
+                        <p className="text-center text-sm text-gray-600">
+                            Don't have an account?{' '}
+                            <Link to="/register" className="font-semibold text-primary-600 hover:text-primary-500">
+                                Sign up for free
+                            </Link>
+                        </p>
+                    </form>
+                </div>
+            </div>
         </div>
-
-        {/* Form */}
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm">
-            {/* Email */}
-            <div className="relative mb-4">
-              <Mail className="absolute top-3 left-3 text-gray-400" size={20} />
-              <input
-                type="email"
-                required
-                className="appearance-none block w-full px-10 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                placeholder="Email address"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-              />
-            </div>
-
-            {/* Password */}
-            <div className="relative">
-              <Lock className="absolute top-3 left-3 text-gray-400" size={20} />
-              <input
-                type="password"
-                required
-                className="appearance-none block w-full px-10 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                placeholder="Password"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-              />
-            </div>
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="text-red-500 text-sm text-center">{error}</div>
-          )}
-
-          {/* Submit Button */}
-          <div>
-            <button
-              type="submit"
-              className="group relative w-full flex items-center justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition"
-            >
-              Sign in
-              <ArrowRight className="ml-2 -mr-1" size={18} />
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default Login;
