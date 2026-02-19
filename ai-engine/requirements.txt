@@ -1,0 +1,13 @@
+flask
+flask-cors
+opencv-python
+torch
+torchvision
+torchaudio
+diffusers
+transformers
+accelerate
+scikit-learn
+numpy
+pandas
+python-dotenv
