@@ -2,13 +2,11 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import requests
+import base64
 from dotenv import load_dotenv
-from PIL import Image
-import io
 import time
 
 import ollama
-import google.generativeai as genai
 
 # Load environment variables
 load_dotenv()
@@ -16,19 +14,27 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Configure Gemini
-GENAI_API_KEY = os.getenv('GEMINI_API_KEY')
-if GENAI_API_KEY:
-    genai.configure(api_key=GENAI_API_KEY)
+# Configure NVIDIA FLUX API
+NVIDIA_API_KEY = os.getenv('NVIDIA_API_KEY', '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')
+NVIDIA_INVOKE_URL = "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.2-klein-4b"
 
-# Configure Hugging Face
-HF_API_TOKEN = os.getenv('HF_API_TOKEN')
-HF_API_URL = "https://router.huggingface.co/models/stabilityai/stable-diffusion-2-1"  
-headers = {"Authorization": f"Bearer {HF_API_TOKEN}"}
-
-def query_huggingface(payload):
-    response = requests.post(HF_API_URL, headers=headers, json=payload)
-    return response.content
+def query_nvidia_flux(prompt, image_b64, width=1024, height=1024, seed=0, steps=4):
+    """Call NVIDIA FLUX API to generate an image."""
+    nvidia_headers = {
+        "Authorization": f"Bearer {NVIDIA_API_KEY}",
+        "Accept": "application/json",
+    }
+    payload = {
+        "prompt": prompt,
+        "image": [f"data:image/png;base64,{image_b64}"],
+        "width": width,
+        "height": height,
+        "seed": seed,
+        "steps": steps
+    }
+    response = requests.post(NVIDIA_INVOKE_URL, headers=nvidia_headers, json=payload)
+    response.raise_for_status()
+    return response.json()
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -40,8 +46,6 @@ def chat():
         return jsonify({'error': 'No message provided'}), 400
 
     try:
-        # Use a lightweight model by default, assume 'llama3' or 'mistral' is pulled
-        # Check if we can specify model from env or default
         model_name = os.getenv('OLLAMA_MODEL', 'llama3')
         
         system_prompt = (
@@ -54,7 +58,6 @@ def chat():
         )
 
         messages = [{'role': 'system', 'content': system_prompt}]
-        # Append history if needed, for now just current message
         messages.append({'role': 'user', 'content': user_message})
 
         response = ollama.chat(model=model_name, messages=messages)
@@ -65,42 +68,6 @@ def chat():
         print(f"Ollama Error: {e}")
         return jsonify({'error': str(e), 'reply': "I'm having trouble connecting to my brain (Ollama). Please ensure it's running."}), 500
 
-
-# Configure Local Stable Diffusion
-import torch
-from diffusers import StableDiffusionPipeline
-
-# Global variable to hold the model (lazy loading)
-pipe = None
-
-def get_db_pipe():
-    global pipe
-    if pipe is None:
-        print("Loading Stable Diffusion Model... (This may take time on first run)")
-        try:
-            model_id = "runwayml/stable-diffusion-v1-5"
-            # Use fp16 for less VRAM usage (good for 4GB usage)
-            pipe = StableDiffusionPipeline.from_pretrained(
-                model_id, 
-                torch_dtype=torch.float16, 
-                use_safetensors=True,
-                safety_checker=None # Optional: Disable safety checker to save VRAM
-            )
-            # Move to GPU
-            if torch.cuda.is_available():
-                pipe = pipe.to("cuda")
-                # Optimizations for low VRAM (4GB)
-                pipe.enable_attention_slicing()
-                # pipe.enable_model_cpu_offload() # Alternative if 4GB is still tight
-            else:
-                print("CUDA not available. Running on CPU (Very Slow).")
-                pipe = pipe.to("cpu")
-                
-            print("Model loaded successfully!")
-        except Exception as e:
-            print(f"Failed to load model: {e}")
-            return None
-    return pipe
 
 # Define Project Root
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # .../ai_service
@@ -121,10 +88,9 @@ def generate_design():
 
     # Resolve Image Path (Robustly)
     if not os.path.isabs(image_path):
-        # Try finding the file in likely locations
         candidates = [
-            os.path.join(PROJECT_ROOT, image_path),          # If path is from root
-            os.path.join(PROJECT_ROOT, 'server', image_path) # If path is relative to server
+            os.path.join(PROJECT_ROOT, image_path),
+            os.path.join(PROJECT_ROOT, 'server', image_path)
         ]
         for c in candidates:
             if os.path.exists(c):
@@ -132,82 +98,69 @@ def generate_design():
                 break
     
     if not os.path.exists(image_path):
-         return jsonify({'status': 'error', 'message': f'Image file not found: {image_path}'}), 400
+        return jsonify({'status': 'error', 'message': f'Image file not found: {image_path}'}), 400
 
     generated_image_path = None
-    ai_message = "Design generated locally."
+    ai_message = "Design generated via NVIDIA FLUX API."
 
     try:
-        # Load Model
-        sd_pipe = get_db_pipe()
-        
-        if sd_pipe:
-            # Construct Prompt
-            prompt = f"Professional interior design of a {style} {room_type}, photorealistic, 8k, high quality, architectural photography, detailed, cinematic lighting and make sure the output is based on the provided image"
-            negative_prompt = "low quality, bad quality, sketches, terrible, lowres, blurring"
+        # Read and encode the input image as base64
+        with open(image_path, "rb") as img_file:
+            image_b64 = base64.b64encode(img_file.read()).decode("utf-8")
 
-            print(f"Generating image with prompt: {prompt}...")
-            
-            # Generate
-            # Determine steps based on hardware (keep it lower for speed/memory if needed)
-            image = sd_pipe(
-                prompt=prompt, 
-                negative_prompt=negative_prompt, 
-                num_inference_steps=25, 
-                guidance_scale=7.5
-            ).images[0]
+        # Construct prompt
+        prompt = (
+            f"Professional interior design of a {style} {room_type}, "
+            "photorealistic, 8k, high quality, architectural photography, "
+            "detailed, cinematic lighting, based on the provided room image"
+        )
 
-            # Save the generated image
-            timestamp = int(time.time() * 1000)
-            filename = f"generated_{timestamp}.png"
-            
-            # Ensure directory exists at PROJECT_ROOT/server/uploads
-            save_dir = os.path.join(PROJECT_ROOT, 'server', 'uploads')
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
-                
-            save_path = os.path.join(save_dir, filename)
-            image.save(save_path)
-            print(f"Image saved to {save_path}")
-            
-            generated_image_path = f"uploads/{filename}"
-            ai_message = "Design generated successfully by Local Stable Diffusion."
+        print(f"Calling NVIDIA FLUX API with prompt: {prompt}...")
 
-        else:
-             raise Exception("Model failed to load.")
+        response_body = query_nvidia_flux(
+            prompt=prompt,
+            image_b64=image_b64,
+            width=1024,
+            height=1024,
+            seed=0,
+            steps=4
+        )
+
+        print(f"NVIDIA FLUX response received.")
+
+        # Extract the generated image from the response
+        # NVIDIA returns base64-encoded image(s) under 'artifacts' or 'images'
+        generated_b64 = None
+        if "artifacts" in response_body and response_body["artifacts"]:
+            generated_b64 = response_body["artifacts"][0].get("base64")
+        elif "images" in response_body and response_body["images"]:
+            generated_b64 = response_body["images"][0]
+
+        if not generated_b64:
+            raise Exception(f"No image in NVIDIA FLUX response: {response_body}")
+
+        # Decode and save the generated image
+        image_data = base64.b64decode(generated_b64)
+        timestamp = int(time.time() * 1000)
+        filename = f"generated_{timestamp}.png"
+
+        save_dir = os.path.join(PROJECT_ROOT, 'server', 'uploads')
+        os.makedirs(save_dir, exist_ok=True)
+
+        save_path = os.path.join(save_dir, filename)
+        with open(save_path, "wb") as f:
+            f.write(image_data)
+
+        print(f"Generated image saved to {save_path}")
+        generated_image_path = f"uploads/{filename}"
 
     except Exception as e:
-        print(f"Error calling Local SD: {e}")
-        
-        # FALLBACK: Try Gemini for Text Analysis if Local Gen fails
-        if GENAI_API_KEY:
-            print("Attempting fallback to Gemini (Text Analysis)...")
-            try:
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                
-                # Check if image exists for Gemini
-                if os.path.exists(image_path):
-                    img = Image.open(image_path)
-                    gemini_prompt = f"Act as an interior designer. Analyze this room and provide detailed suggestions to redesign it in a {style} style for a {room_type}. Be specific about colors, furniture, and layout."
-                    
-                    response = model.generate_content([gemini_prompt, img])
-                    gemini_text = response.text
-                    
-                    return jsonify({
-                        'status': 'success',
-                        'generated_image': image_path, # Return original image as visual
-                        'message': f"Image generation failed ({str(e)}), but here is Gemini's Expert Advice:\n\n{gemini_text}",
-                        'fallback': True
-                    })
-            except Exception as gemini_error:
-                 print(f"Gemini Error: {gemini_error}")
-                 return jsonify({'status': 'error', 'message': f"Gemini Error: {str(gemini_error)}"}), 500
-        else:
-             return jsonify({'status': 'error', 'message': f"Local Gen Failed: {str(e)}"}), 500
+        print(f"Error calling NVIDIA FLUX API: {e}")
+        return jsonify({'status': 'error', 'message': f"NVIDIA FLUX Failed: {str(e)}"}), 500
 
     return jsonify({
         'status': 'success',
-        'generated_image': generated_image_path, 
+        'generated_image': generated_image_path,
         'message': ai_message
     })
 
