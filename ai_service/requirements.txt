@@ -2,13 +2,4 @@ flask
 flask-cors
 requests
 python-dotenv
-Pillow
 ollama
-google-generativeai
-diffusers
-transformers
-accelerate
-torch
-torchvision
-scipy
-protobuf
