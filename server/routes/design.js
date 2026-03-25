@@ -61,34 +61,61 @@ router.get('/user/:userId', async (req, res) => {
 router.post('/generate', async (req, res) => {
     try {
         const { roomId } = req.body;
-        const room = await Room.findById(roomId);
-        if (!room) {
-            return res.status(404).json({ msg: 'Room not found' });
+
+        if (!roomId) {
+            return res.status(400).json({ msg: "roomId is required" });
         }
 
+        const room = await Room.findById(roomId);
+        if (!room) {
+            return res.status(404).json({ msg: "Room not found" });
+        }
+
+        // 🔥 Convert to absolute path (CRITICAL FIX)
+        const absoluteImagePath = path.resolve(room.originalImage);
+
         try {
-            // Call Python Service
-            const aiResponse = await axios.post('http://localhost:5001/generate', {
-                roomType: room.roomType,
-                style: room.stylePreference,
-                imagePath: room.originalImage
-            });
+            const aiResponse = await axios.post(
+                'http://127.0.0.1:5001/generate/',  // ✅ trailing slash fixed
+                {
+                    roomType: room.roomType,
+                    style: room.stylePreference,
+                    imagePath: absoluteImagePath
+                },
+                {
+                    timeout: 30000 // avoid hanging forever
+                }
+            );
+
+            if (!aiResponse.data || aiResponse.data.status !== "success") {
+                throw new Error("Invalid AI response");
+            }
 
             room.generatedDesign = aiResponse.data.generated_image;
             await room.save();
 
-            res.json({ msg: 'Design generated', design: room.generatedDesign, details: aiResponse.data.message });
+            return res.json({
+                msg: "Design generated",
+                design: room.generatedDesign,
+                details: aiResponse.data.message
+            });
+
         } catch (aiError) {
-            console.error("AI Service Error:", aiError.message);
-            // Fallback
+            console.error("AI Service Error:", aiError.response?.data || aiError.message);
+
+            // fallback (don't break UX)
             room.generatedDesign = room.originalImage;
             await room.save();
-            res.json({ msg: 'Design generated (Fallback)', design: room.generatedDesign });
+
+            return res.status(200).json({
+                msg: "Design generated (fallback used)",
+                design: room.generatedDesign
+            });
         }
 
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error("Server Error:", err.message);
+        return res.status(500).json({ msg: "Server Error" });
     }
 });
 
